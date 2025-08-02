@@ -71,4 +71,4 @@ This project was completed with reference to the following project:
 
 [codesys-api by claude](https://github.com/johannesPettersson80/codesys-api)
 
-It is worth noting that the author of this project used Claude for coding. We have tested it on CODESYS, fixed many non-functional parts, and improved the core working mode to ensure support for at least 4-5 concurrent accesses.
+It is worth noting that the author of this project used Claude for coding. We have tested it on CODESYS, fixed many functional errors, and improved the core working mode to ensure support for at least 4-5 concurrent accesses.
