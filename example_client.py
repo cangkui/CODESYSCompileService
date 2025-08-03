@@ -225,6 +225,8 @@ def initialize():
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = Path(script_dir) / "projects"
+    if not project_dir.exists():
+        project_dir.mkdir(parents=True)
     for proj in project_dir.iterdir():
         if not proj.is_dir():
             proj.unlink()
