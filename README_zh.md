@@ -14,6 +14,10 @@
 > 选择Extract into the same folder where the archive is located，并且点击确定提取  
 > 模板项目将被提取至`template`目录，保存并退出。
 
+提取出来的模板项目如下所示，设备图标正常显示:
+
+![Template Project](images/codesys_template.png)
+
 **Python环境配置**
 
 在Windows下通过venv模块创建虚拟环境并且激活。

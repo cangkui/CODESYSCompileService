@@ -13,6 +13,10 @@
 > Select `Extract into the same folder where the archive is located`, and click `Extract`
 > Template project will be generated in `template`, then save project and exit.
 
+After Extracting, the template project will like this:
+
+![Template Project](images/codesys_template.png)
+
 ### Python Environment Configuration
 Create and activate a virtual environment using the venv module on Windows.
 ```
