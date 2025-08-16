@@ -219,3 +219,6 @@ session_status.json
 *.json
 *.log
 test*
+
+*.opt
+*.precompilecache

@@ -7,6 +7,11 @@
 ### CODESYS Configuration
 1. The recommended operating system is Windows 10 or above. The tested CODESYS version is `3.5.20.40 (V3.5) SP20 Patch 4`.
 2. In `HTTP_SERVER.py`, modify the path of `CODESYS.exe` to the path of `CODESYS.exe`installed in your current system.
+3. Extract template project. The template project we provided contains 3 additional libraries: OSCAT BASIC, OSCAT NETWORK and OSCAT BUILDING. If you rely on additional libraries, please open the extracted `.project` in CODESYS and download them through the Library Manager yourself.  
+
+> In CODESYS, File->Project Archive->Extract Archive, open the `.projectarchive` file in `template`
+> Select `Extract into the same folder where the archive is located`, and click `Extract`
+> Template project will be generated in `template`, then save project and exit.
 
 ### Python Environment Configuration
 Create and activate a virtual environment using the venv module on Windows.
