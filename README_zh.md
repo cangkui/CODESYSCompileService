@@ -10,9 +10,10 @@
 
 3. 提取模板项目。仓库提供的模板项目包含三个额外的库：OSCAT BASIC，OSCAT NETWORK，OSCAT BUILDING，如果依赖额外的库，请自行通过库管理器下载。  
 
-> CODESYS内，File->Project Archive->Extract Archive，打开`template`目录下的`.projectarchive`进行解包  
-> 选择Extract into the same folder where the archive is located，并且点击确定提取  
-> 模板项目将被提取至`template`目录，保存并退出。
+> Tips:  
+> - CODESYS内，File->Project Archive->Extract Archive，打开`template`目录下的`.projectarchive`进行解包  
+> - 选择Extract into the same folder where the archive is located，并且点击确定提取  
+> - 模板项目将被提取至`template`目录，保存并退出。
 
 提取出来的模板项目如下所示，设备图标正常显示:
 
