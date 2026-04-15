@@ -13,6 +13,9 @@ import os
 import logging
 import time
 import HTTP_SERVER
+from pathlib import Path
+import tempfile
+import shutil
 
 # Configure logging to output to console
 logging.basicConfig(
@@ -46,6 +49,14 @@ def run_debug_server():
         logger.info("  REQUEST_DIR: %s", HTTP_SERVER.REQUEST_DIR)
         logger.info("  RESULT_DIR: %s", HTTP_SERVER.RESULT_DIR)
         
+        # Clean Up old request files
+        request_path = Path(__file__).parent / "temp"
+        for folder in request_path.glob("codesys_req_*"):
+            if folder.is_dir():
+                # logger.info(f"Removing folder: {folder}")
+                # remove the folder
+                shutil.rmtree(folder)
+
         # Verify directories exist
         for directory in [HTTP_SERVER.REQUEST_DIR, HTTP_SERVER.RESULT_DIR]:
             if os.path.exists(directory):

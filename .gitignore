@@ -211,6 +211,7 @@ example_scripts/
 results/
 requests/
 projects/
+temp/
 .vscode/
 # API keys and configuration
 api_keys.json

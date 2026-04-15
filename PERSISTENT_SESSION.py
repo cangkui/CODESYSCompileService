@@ -240,7 +240,7 @@ class CodesysPersistentSession(object):
                 self.periodic_tasks()
 
                 # Sleep to prevent CPU hogging
-                time.sleep(0.1)
+                time.sleep(0.01)
                 
             self.log("Exiting main loop")
             return True
@@ -432,7 +432,7 @@ class CodesysPersistentSession(object):
                 #     self.active_project.active_application.clean()
                 #     self.jobs_cnt = 0
                 #     self.log("App cleaned in %.2f seconds" % (time.time() - t1))
-                if self.jobs_cnt > 20:
+                if self.jobs_cnt > 100:
                     gc.collect()
                     self.log("GC cleaned")
                     self.jobs_cnt = 0
@@ -441,7 +441,7 @@ class CodesysPersistentSession(object):
                 # before = len(gc.get_objects())
                 exec(script_code, global_vars, local_vars)
                 # after = len(gc.get_objects())
-                self.log("AAAAAA Script exec time: %.2f " % (time.time() - t1))
+                self.log("Script exec time: %.2f " % (time.time() - t1))
                 # self.log("GC object growth: %d" % (after - before))
                 # self.log("Lengtgh of globals: %d" % len(globals_dict))
                 self.jobs_cnt += 1

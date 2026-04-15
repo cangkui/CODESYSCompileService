@@ -25,6 +25,7 @@ import logging
 import traceback
 import re
 import socket
+from pathlib import Path
 
 # Python 3 compatibility imports
 try:
@@ -64,6 +65,7 @@ PERSISTENT_SCRIPT = os.path.join(SCRIPT_DIR, "PERSISTENT_SESSION.py")
 API_KEY_FILE = os.path.join(SCRIPT_DIR, "api_keys.json")
 REQUEST_DIR = os.path.join(SCRIPT_DIR, "requests")
 RESULT_DIR = os.path.join(SCRIPT_DIR, "results")
+TEMP_DIR = os.path.join(SCRIPT_DIR, "temp")
 TERMINATION_SIGNAL_FILE = os.path.join(SCRIPT_DIR, "terminate.signal")
 STATUS_FILE = os.path.join(SCRIPT_DIR, "session_status.json")
 LOG_FILE = os.path.join(SCRIPT_DIR, "session.log")
@@ -89,8 +91,8 @@ def ensure_directory(path):
 # Create necessary directories
 ensure_directory(REQUEST_DIR)
 ensure_directory(RESULT_DIR)
-temp_dir = tempfile.gettempdir()
-ensure_directory(temp_dir)
+# TEMP_DIR = tempfile.gettempdir()
+ensure_directory(TEMP_DIR)
 
 class CodesysProcessManager:
     """Manages the CODESYS process."""
@@ -358,7 +360,7 @@ class ScriptExecutor:
             logger.info("Script preview: %s...", script_preview)
             
             # Create dedicated directory for this request to avoid path issues
-            request_dir = os.path.join(tempfile.gettempdir(), f"codesys_req_{request_id}")
+            request_dir = os.path.join(TEMP_DIR, f"codesys_req_{request_id}")
             if not os.path.exists(request_dir):
                 os.makedirs(request_dir)
                 logger.debug("Created request directory: %s", request_dir)
@@ -531,40 +533,40 @@ class ScriptExecutor:
             }
             
             # Timeout
-            elapsed = time.time() - start_time
-            logger.error("Script execution timed out after %.2f seconds (%d checks)", elapsed, check_count)
+            # elapsed = time.time() - start_time
+            # logger.error("Script execution timed out after %.2f seconds (%d checks)", elapsed, check_count)
             
-            # Create error result file for reference
-            try:
-                with open(result_path, 'w', encoding='utf-8') as f:
-                    error_result = {
-                        "success": False,
-                        "error": f"Script execution timed out after {timeout} seconds",
-                        "checks": check_count,
-                        "request_id": request_id
-                    }
-                    json.dump(error_result, f)
-                logger.debug("Created timeout error result file")
-            except Exception as e:
-                logger.error("Error creating timeout error result file: %s", str(e))
+            # # Create error result file for reference
+            # try:
+            #     with open(result_path, 'w', encoding='utf-8') as f:
+            #         error_result = {
+            #             "success": False,
+            #             "error": f"Script execution timed out after {timeout} seconds",
+            #             "checks": check_count,
+            #             "request_id": request_id
+            #         }
+            #         json.dump(error_result, f)
+            #     logger.debug("Created timeout error result file")
+            # except Exception as e:
+            #     logger.error("Error creating timeout error result file: %s", str(e))
             
-            # Clean up files but keep script for debugging
-            self._cleanup_files(None, None, request_path, None)
-            logger.info("Kept script file for debugging: %s", script_path)
+            # # Clean up files but keep script for debugging
+            # self._cleanup_files(None, None, request_path, None)
+            # logger.info("Kept script file for debugging: %s", script_path)
             
-            return {
-                "success": False, 
-                "error": f"Script execution timed out after {timeout} seconds",
-                "script_path": script_path,
-                "result_path": result_path,
-                "request_id": request_id
-            }
+            # return {
+            #     "success": False, 
+            #     "error": f"Script execution timed out after {timeout} seconds",
+            #     "script_path": script_path,
+            #     "result_path": result_path,
+            #     "request_id": request_id
+            # }
         except Exception as e:
             logger.error("Error executing script (request ID: %s): %s", request_id, str(e))
             logger.error(traceback.format_exc())
             # Attempt to clean up files
-            if script_path or result_path or request_path:
-                self._cleanup_files(script_path, result_path, request_path, request_dir)
+            # if script_path or result_path or request_path:
+            #     self._cleanup_files(script_path, result_path, request_path, request_dir)
             return {"success": False, "error": str(e)}
             
     def _cleanup_files(self, script_path, result_path, request_path, request_dir=None):
@@ -584,7 +586,7 @@ class ScriptExecutor:
             try:
                 if os.path.exists(path):
                     os.remove(path)
-                    logger.debug("Removed temporary file: %s", path)
+                    # logger.debug("Removed temporary file: %s", path)
             except Exception as e:
                 logger.warning("Failed to remove temporary file %s: %s", path, str(e))
         
@@ -594,11 +596,12 @@ class ScriptExecutor:
                 # Check if directory is empty
                 if not os.listdir(request_dir):
                     os.rmdir(request_dir)
-                    logger.debug("Removed empty request directory: %s", request_dir)
+                    # logger.debug("Removed empty request directory: %s", request_dir)
                 else:
-                    logger.warning("Request directory not empty, not removing: %s", request_dir)
+                    # logger.warning("Request directory not empty, not removing: %s", request_dir)
                     # List files left in directory
-                    logger.debug("Files remaining in request directory: %s", os.listdir(request_dir))
+                    # logger.debug("Files remaining in request directory: %s", os.listdir(request_dir))
+                    ...
             except Exception as e:
                 logger.warning("Failed to remove request directory %s: %s", request_dir, str(e))
 
@@ -775,1086 +778,6 @@ except:
         "error": str(error_value)
     }}
 """.format(path.replace("\\", "\\\\"), template_path.replace("\\", "\\\\"), codesys_path.replace("\\", "\\\\"))
-        
-    def generate_project_open_script(self, params):
-        """Generate script to open a project."""
-        path = params.get("path", "")
-        
-        return """
-import scriptengine
-import json
-import sys
-import os
-import traceback
-
-try:
-    print("Starting project open script")
-    print("Opening project at path: {0}")
-    
-    # Check if global instances are available
-    if not hasattr(scriptengine, 'projects'):
-        print("Global scriptengine.projects instance not found")
-        result = {{"success": False, "error": "Global scriptengine.projects instance not found"}}
-    else:
-        try:
-            # Open project using the global projects instance
-            print("Using global scriptengine.projects instance to open project")
-            project = scriptengine.projects.open("{0}")
-            
-            if project is None:
-                print("Project open returned None")
-                result = {{"success": False, "error": "Project open operation returned None"}}
-            else:
-                print("Project opened successfully")
-                
-                # Store as active project in session
-                print("Storing project as active project in session")
-                session.active_project = project
-                
-                # Get project info for result, with careful attribute checking
-                project_info = {{"path": "{0}"}}  # Always include the path that was requested
-                
-                # Get actual path from project object if available
-                if hasattr(project, 'path'):
-                    project_info['path'] = project.path
-                    print("Project path: " + project.path)
-                    
-                    # Try to extract name from path if name attribute is missing
-                    if not hasattr(project, 'name'):
-                        try:
-                            project_info['name'] = os.path.basename(project.path)
-                            print("Extracted name from path: " + project_info['name'])
-                        except Exception as name_error:
-                            project_info['name'] = os.path.basename("{0}")
-                            print("Error extracting name from path, using request path basename instead")
-                else:
-                    print("Project has no path attribute, using request path")
-                
-                # Check for name attribute (if not already set above)
-                if 'name' not in project_info and hasattr(project, 'name'):
-                    project_info['name'] = project.name
-                    print("Project name: " + project.name)
-                elif 'name' not in project_info:
-                    # Last resort - extract from the requested path
-                    project_info['name'] = os.path.basename("{0}")
-                    print("Using name from request path: " + project_info['name'])
-                
-                # Check for dirty attribute
-                if hasattr(project, 'dirty'):
-                    project_info['dirty'] = project.dirty
-                    print("Project dirty flag: " + str(project.dirty))
-                else:
-                    project_info['dirty'] = False
-                    print("Project has no dirty attribute, assuming False")
-                
-                # Return project info
-                result = {{
-                    "success": True,
-                    "project": project_info
-                }}
-                print("Project open completed successfully")
-        except Exception as e:
-            print("Error opening project: " + str(e))
-            print(traceback.format_exc())
-            result = {{"success": False, "error": "Error opening project: " + str(e)}}
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in project open script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {{"success": False, "error": str(error_value)}}
-""".format(path.replace("\\", "\\\\"))
-        
-    def generate_project_save_script(self):
-        """Generate script to save current project."""
-        return """
-import scriptengine
-import json
-import sys
-import os
-import traceback
-
-try:
-    print("Starting project save script")
-    
-    # Check if we have an active project
-    if not hasattr(session, 'active_project') or session.active_project is None:
-        print("No active project in session")
-        result = {"success": False, "error": "No active project in session"}
-    else:
-        # Get active project
-        project = session.active_project
-        print("Got active project")
-        
-        # Check if project has save method
-        if not hasattr(project, 'save'):
-            print("Project has no save method")
-            result = {"success": False, "error": "Project object has no save method"}
-        else:
-            # Save project
-            print("Saving project...")
-            project.save()
-            print("Project saved successfully")
-            
-            # Get project info for result, with careful attribute checking
-            project_info = {}
-            
-            # Check for path attribute
-            if hasattr(project, 'path'):
-                project_info['path'] = project.path
-                # Try to extract name from path if name attribute is missing
-                if not hasattr(project, 'name'):
-                    try:
-                        project_info['name'] = os.path.basename(project.path)
-                        print("Extracted name from path: " + project_info['name'])
-                    except Exception as name_error:
-                        project_info['name'] = "Unknown"
-                        print("Error extracting name from path: " + str(name_error))
-            else:
-                project_info['path'] = "Unknown"
-                print("Project has no path attribute")
-            
-            # Check for name attribute (if not already set above)
-            if 'name' not in project_info and hasattr(project, 'name'):
-                project_info['name'] = project.name
-            
-            # Check for dirty attribute
-            if hasattr(project, 'dirty'):
-                project_info['dirty'] = project.dirty
-            else:
-                project_info['dirty'] = False
-                print("Project has no dirty attribute, assuming False")
-            
-            # Return project info
-            result = {
-                "success": True,
-                "project": project_info
-            }
-            print("Project info prepared for result")
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in project save script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {"success": False, "error": str(error_value)}
-"""
-        
-    def generate_project_close_script(self):
-        """Generate script to close current project."""
-        return """
-import scriptengine
-import json
-import sys
-import os
-import traceback
-
-try:
-    print("Starting project close script")
-    
-    # Check if we have an active project
-    if not hasattr(session, 'active_project') or session.active_project is None:
-        print("No active project in session")
-        result = {"success": False, "error": "No active project in session"}
-    else:
-        # Get active project
-        project = session.active_project
-        print("Got active project")
-        
-        # Store project info for result, with careful attribute checking
-        project_info = {}
-        
-        # Check for path attribute
-        if hasattr(project, 'path'):
-            project_info['path'] = project.path
-            print("Project path: " + project.path)
-            
-            # Try to extract name from path if name attribute is missing
-            if not hasattr(project, 'name'):
-                try:
-                    project_info['name'] = os.path.basename(project.path)
-                    print("Extracted name from path: " + project_info['name'])
-                except Exception as name_error:
-                    project_info['name'] = "Unknown"
-                    print("Error extracting name from path: " + str(name_error))
-        else:
-            project_info['path'] = "Unknown"
-            print("Project has no path attribute")
-        
-        # Check for name attribute (if not already set above)
-        if 'name' not in project_info and hasattr(project, 'name'):
-            project_info['name'] = project.name
-            print("Project name: " + project.name)
-        
-        # Try to close project if it has a close method
-        if hasattr(project, 'close'):
-            try:
-                print("Closing project using project.close() method")
-                project.close()
-                print("Project closed via close() method")
-            except Exception as close_error:
-                print("Error closing project via close() method: " + str(close_error))
-                print("Will still try to clear session.active_project")
-        else:
-            print("Project has no close() method, will just clear session.active_project")
-        
-        # Clear session active project
-        print("Clearing session.active_project reference")
-        session.active_project = None
-        print("Project reference cleared from session")
-        
-        # Return project info
-        result = {
-            "success": True,
-            "project": project_info
-        }
-        print("Project close completed successfully")
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in project close script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {"success": False, "error": str(error_value)}
-"""
-
-    def generate_project_list_script(self):
-        """Generate script to list recent projects."""
-        return """
-import scriptengine
-import json
-import os
-import sys
-import traceback
-
-try:
-    print("Starting project list script")
-    
-    # Check if global instances are available
-    if not hasattr(scriptengine, 'projects'):
-        print("Global scriptengine.projects instance not found")
-        result = {{"success": False, "error": "Global scriptengine.projects instance not found"}}
-    else:
-        print("Using global scriptengine.projects instance for project listing")
-        
-        # Get recent projects list
-        recent_projects = []
-        
-        try:
-            # Check for recent_projects attribute on global projects instance
-            if hasattr(scriptengine.projects, 'recent_projects'):
-                # Direct access if available
-                print("Getting projects via scriptengine.projects.recent_projects attribute")
-                recent_projects = scriptengine.projects.recent_projects
-            elif hasattr(scriptengine.projects, 'get_recent_projects'):
-                # Function call if available
-                print("Getting projects via scriptengine.projects.get_recent_projects() method")
-                recent_projects = scriptengine.projects.get_recent_projects()
-            else:
-                print("No method found to get recent projects list")
-            
-            # Format project list
-            print("Processing project list with " + str(len(recent_projects) if recent_projects else 0) + " projects")
-            projects = []
-            
-            if recent_projects:
-                for project in recent_projects:
-                    try:
-                        project_info = {{"name": "Unknown", "path": "Unknown"}}
-                        
-                        # Get path
-                        if hasattr(project, 'path'):
-                            project_info["path"] = project.path
-                            print("Project path: " + project.path)
-                            
-                            # Try to extract name from path
-                            try:
-                                project_info["name"] = os.path.basename(project.path)
-                                print("Extracted name from path: " + project_info["name"])
-                            except Exception as name_error:
-                                print("Error extracting name from path: " + str(name_error))
-                        
-                        # Get name if explicitly available
-                        if hasattr(project, 'name'):
-                            project_info["name"] = project.name
-                            print("Project name: " + project.name)
-                        
-                        # Get last opened date if available
-                        if hasattr(project, 'last_opened_date'):
-                            project_info["last_opened"] = project.last_opened_date
-                            print("Last opened date: " + str(project.last_opened_date))
-                        
-                        # Add to list
-                        projects.append(project_info)
-                        print("Added project to list: " + project_info["name"])
-                    except Exception as project_error:
-                        print("Error processing project item: " + str(project_error))
-            else:
-                print("No recent projects found")
-            
-            # Return projects list
-            result = {{
-                "success": True,
-                "projects": projects
-            }}
-            print("Project list processing completed successfully")
-        except Exception as e:
-            print("Error processing projects list: " + str(e))
-            print(traceback.format_exc())
-            result = {{"success": False, "error": "Error processing projects list: " + str(e)}}
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in project list script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {{"success": False, "error": str(error_value)}}
-"""
-
-    def generate_project_compile_script(self, params):
-        """Generate script to compile a project."""
-        clean_build = params.get("clean_build", False)
-        
-        return """
-import scriptengine
-import json
-import time
-import sys
-import traceback
-
-try:
-    print("Starting project compile script")
-    print("Clean build requested: {0}")
-    
-    # Check if we have an active project
-    if not hasattr(session, 'active_project') or session.active_project is None:
-        print("No active project in session")
-        result = {{"success": False, "error": "No active project in session"}}
-    else:
-        # Get active project
-        project = session.active_project
-        print("Got active project")
-        
-        # Try to get application
-        if not hasattr(project, 'active_application') or project.active_application is None:
-            print("Project has no active application")
-            result = {{"success": False, "error": "Project has no active application"}}
-        else:
-            # Get application
-            application = project.active_application
-            print("Got active application")
-            
-            # Check if application has build method
-            if not hasattr(application, 'build'):
-                print("Application has no build method")
-                result = {{"success": False, "error": "Application object has no build method"}}
-            else:
-                # Start time for compilation
-                start_time = time.time()
-                print("Starting build process...")
-                
-                # Clean build if requested
-                if "{0}" == "true" and hasattr(application, 'clean'):
-                    try:
-                        print("Performing clean build")
-                        application.clean()
-                        print("Clean operation completed")
-                    except Exception as clean_error:
-                        print("Error during clean operation: " + str(clean_error))
-                        print("Will attempt to continue with build anyway")
-                
-                try:
-                    # Compile application
-                    print("Building application...")
-                    build_result = application.build()
-                    print("Build operation completed")
-                    
-                    # Calculate compilation time
-                    compilation_time = time.time() - start_time
-                    print("Build duration: " + str(compilation_time) + " seconds")
-                    
-                    # Check for errors
-                    has_errors = False
-                    error_count = 0
-                    warning_count = 0
-                    
-                    # Get error information, with careful attribute checking
-                    if build_result is None:
-                        print("Build result is None, assuming no errors")
-                    else:
-                        if hasattr(build_result, 'has_errors'):
-                            has_errors = build_result.has_errors
-                            print("Has errors: " + str(has_errors))
-                        else:
-                            print("Build result has no has_errors attribute, assuming False")
-                        
-                        if hasattr(build_result, 'error_count'):
-                            error_count = build_result.error_count
-                            print("Error count: " + str(error_count))
-                        else:
-                            print("Build result has no error_count attribute, assuming 0")
-                        
-                        if hasattr(build_result, 'warning_count'):
-                            warning_count = build_result.warning_count
-                            print("Warning count: " + str(warning_count))
-                        else:
-                            print("Build result has no warning_count attribute, assuming 0")
-                    
-                    # If has_errors is not available, try to determine from error_count
-                    if not hasattr(build_result, 'has_errors') and error_count > 0:
-                        has_errors = True
-                        print("Setting has_errors=True based on error_count")
-                    
-                    # Return compilation result
-                    result = {{
-                        "success": not has_errors,
-                        "compilation": {{
-                            "duration_seconds": compilation_time,
-                            "errors": error_count,
-                            "warnings": warning_count,
-                            "has_errors": has_errors
-                        }}
-                    }}
-                    print("Compilation result prepared")
-                except Exception as build_error:
-                    print("Error during build operation: " + str(build_error))
-                    print(traceback.format_exc())
-                    result = {{"success": False, "error": "Build operation failed: " + str(build_error)}}
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in project compile script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {{"success": False, "error": str(error_value)}}
-""".format("true" if clean_build else "false")
-        
-    def generate_pou_create_script(self, params):
-        """Generate script to create a POU."""
-        name = params.get("name", "")
-        pou_type = params.get("type", "FunctionBlock")
-        language = params.get("language", "ST")
-        parent_path = params.get("parentPath", "")
-        
-        # Create a more robust script that handles potential enum issues
-        return """
-import scriptengine
-import json
-import sys
-import traceback
-
-try:
-    print("Starting POU creation script for {0}")
-    
-    # Check if we have an active project
-    if not hasattr(session, 'active_project') or session.active_project is None:
-        print("No active project in session")
-        result = {{"success": False, "error": "No active project in session"}}
-    else:
-        # Get active project
-        project = session.active_project
-        print("Got active project")
-        
-        # Try to get application
-        if not hasattr(project, 'active_application') or project.active_application is None:
-            print("Project has no active application")
-            result = {{"success": False, "error": "Project has no active application"}}
-        else:
-            # Get application
-            application = project.active_application
-            print("Got active application")
-            
-            # The application itself should implement IecLanguageObjectContainer
-            # We'll try to use it directly
-            container = application
-            print("Using application object directly for POU creation")
-            
-            # Handle parent path navigation if needed
-            if "{2}":
-                print("Navigating to parent path: {2}")
-                try:
-                    # Navigate to parent container
-                    path_parts = "{2}".split('/')
-                    current = application
-                    for part in path_parts:
-                        if not part:
-                            continue
-                        if hasattr(current, 'find_object'):
-                            current = current.find_object(part)
-                        elif hasattr(current, 'get_object'):
-                            current = current.get_object(part)
-                        else:
-                            raise ValueError("Cannot navigate to " + part)
-                    
-                    if hasattr(current, 'pou_container'):
-                        container = current.pou_container
-                    else:
-                        container = current
-                    print("Navigation to parent path successful")
-                except Exception as e:
-                    print("Error navigating to parent path: " + str(e))
-                    result = {{"success": False, "error": "Error navigating to parent path: " + str(e)}}
-            
-            # Use the properly defined POU types and implementation languages
-            if not 'result' in locals():  # Only proceed if we haven't set an error result
-                try:
-                    # Map the string name to the actual PouType enum value
-                    print("Determining POU type for: {1}")
-                    
-                    # Define POU type map according to the working example code
-                    pou_type_map = {{
-                        "Program": scriptengine.PouType.Program,
-                        "FunctionBlock": scriptengine.PouType.FunctionBlock,
-                        "Function": scriptengine.PouType.Function
-                    }}
-                    
-                    # Get the POU type from the map
-                    if "{1}" in pou_type_map:
-                        pou_type_value = pou_type_map["{1}"]
-                        print("Set POU type to {1}")
-                    else:
-                        print("Unknown POU type: {1}")
-                        result = {{"success": False, "error": "Unknown POU type: {1}"}}
-                        
-                    # Set language to None (let CODESYS default based on parent/settings)
-                    language_value = None
-                    print("Using default language: ST (None)")
-                    
-                    # Handle return type for functions
-                    return_type = None
-                    if "{1}" == "Function":
-                        # For functions, return type is required - use INT as default
-                        return_type = "INT" 
-                        print("Setting return type for function: INT")
-                except Exception as e:
-                    print("Error resolving type values: " + str(e))
-                    result = {{"success": False, "error": "Error resolving type values: " + str(e)}}
-            
-            # Create POU with the correct parameters
-            if not 'result' in locals() and 'pou_type_value' in locals() and pou_type_value is not None:
-                try:
-                    print("Creating POU: {0}")
-                    
-                    # Call with keyword arguments as shown in the example
-                    if "{1}" == "Function":
-                        # For functions, return_type is required
-                        pou = container.create_pou(
-                            name="{0}",
-                            type=pou_type_value,
-                            language=language_value,
-                            return_type=return_type
-                        )
-                        print("Created function with return type")
-                    else:
-                        # For programs and function blocks, return_type should not be specified
-                        pou = container.create_pou(
-                            name="{0}",
-                            type=pou_type_value,
-                            language=language_value
-                        )
-                        print("Created POU without return type")
-                    
-                    if pou is not None:
-                        print("POU created successfully")
-                        result = {{
-                            "success": True,
-                            "pou": {{
-                                "name": "{0}",
-                                "type": "{1}",
-                                "language": "{3}"
-                            }}
-                        }}
-                        project.save()
-                    else:
-                        print("POU creation failed - returned None")
-                        result = {{"success": False, "error": "POU creation failed - returned None"}}
-                except Exception as e:
-                    print("Error creating POU: " + str(e))
-                    result = {{"success": False, "error": "Error creating POU: " + str(e)}}
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in POU creation script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {{"success": False, "error": str(error_value)}}
-""".format(name, pou_type, parent_path, language)
-        
-    def generate_pou_code_script(self, params):
-        """Generate script to set POU code."""
-        pou_path = params.get("path", "")
-        code = params.get("code", "")
-        
-        # Escape code for string literal
-        code = code.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-        
-        # Ensure path includes Application prefix if not present
-        if not pou_path.startswith("Application/") and not pou_path.startswith("application/"):
-            # Add Application/ prefix if not already there
-            full_pou_path = "Application/" + pou_path
-        else:
-            full_pou_path = pou_path
-
-        return """
-import scriptengine
-import json
-import sys
-import traceback
-
-debug_info = "DEBUGGING INFO:\\n"
-
-# Robust object finding function based on working implementation 
-def find_object_by_path_robust(start_node, full_path, target_type_name="object"):
-    global debug_info
-    debug_info += ("Finding " + target_type_name + " by path: '" + full_path + "'") + "\\n"
-    normalized_path = full_path.replace('\\\\\\\\', '/').strip('/')
-    path_parts = normalized_path.split('/')
-    if not path_parts:
-        debug_info += ("ERROR: Path is empty.") + "\\n"
-        return None
-
-    # Determine the actual starting node (project or application)
-    project = start_node  # Assume start_node is project initially
-    if not hasattr(start_node, 'active_application') and hasattr(start_node, 'project'):
-         # If start_node is not project but has project ref (e.g., an application), get the project
-         try: 
-             project = start_node.project
-         except Exception as proj_ref_err:
-             debug_info += ("WARN: Could not get project reference from start_node: " + str(proj_ref_err)) + "\\n"
-             # Proceed assuming start_node might be the project anyway or search fails
-
-    # Try to get the application object robustly if we think we have the project
-    app = None
-    if hasattr(project, 'active_application'):
-        try: 
-            app = project.active_application
-            debug_info += "project.active_application\\n"
-        except Exception: 
-            debug_info += "Ignore errors getting active app\\n"
-            pass  # Ignore errors getting active app
-        
-        if not app:
-            try:
-                # Try to find the application by traversing objects
-                if hasattr(project, 'objects'):
-                    for obj in project.objects:
-                        if hasattr(obj, 'get_name') and obj.get_name() == "Application":
-                            debug_info += "hasattr(obj, get_name) and obj.get_name() == Application\\n"
-                            app = obj
-                            break
-            except Exception: 
-                pass
-
-    # Check if the first path part matches the application name
-    app_name_lower = ""
-    if app:
-        try: 
-            app_name_lower = (app.get_name() or "application").lower()
-            debug_info += "app_name_lower = (app.get_name() or application).lower()\\n"
-        except Exception: 
-            debug_info += "app_name_lower = application except\\n"
-            app_name_lower = "application"  # Fallback
-
-    # Decide where to start the traversal
-    current_obj = start_node  # Default to the node passed in
-    if hasattr(project, 'active_application'):  # Only adjust if start_node was likely the project
-        if app and path_parts[0].lower() == app_name_lower:
-            debug_info += ("Path starts with Application name '" + path_parts[0] + "'. Beginning search there.") + "\\n"
-            current_obj = app
-            path_parts = path_parts[1:]  # Consume the app name part
-            # If path was *only* the application name
-            if not path_parts:
-                debug_info += ("Target path is the Application object itself.") + "\\n"
-                return current_obj
-        else:
-            debug_info += ("Path does not start with Application name. Starting search from project root.") + "\\n"
-            current_obj = project  # Start search from the project root
-    else:
-        debug_info += ("Starting search from originally provided node.") + "\\n"
-
-    # Traverse the remaining path parts
-    parent_path_str = current_obj.get_name() if hasattr(current_obj, 'get_name') else str(current_obj)
-
-    for i, part_name in enumerate(path_parts):
-        is_last_part = (i == len(path_parts) - 1)
-        debug_info += ("Searching for part [" + str(i+1) + "/" + str(len(path_parts)) + "]: '" + part_name + "' under '" + parent_path_str + "'") + "\\n"
-        found_in_parent = None
-        
-        try:
-            # Try various methods to find the child object by name
-            if hasattr(current_obj, 'find'):
-                try:
-                    found_in_parent = current_obj.find(part_name)
-                    if found_in_parent:
-                        debug_info += ("Found via find") + "\\n"
-                except Exception as e:
-                    debug_info += ("Error with find_object: " + str(e)) + "\\n"
-            
-            # Update current object if found
-            if found_in_parent:
-                current_obj = found_in_parent
-                parent_path_str = current_obj.get_name() if hasattr(current_obj, 'get_name') else part_name
-                debug_info += ("Stepped into '" + parent_path_str + "'") + "\\n"
-            else:
-                # If not found at any point, the path is invalid from this parent
-                debug_info += ("ERROR: Path part '" + part_name + "' not found under '" + parent_path_str + "'") + "\\n"
-                return None  # Path broken
-
-        except Exception as find_err:
-            debug_info += ("ERROR: Exception while searching for '" + part_name + "' under '" + parent_path_str + "': " + str(find_err)) + "\\n"
-            debug_info += (traceback.format_exc()) + "\\n"
-            return None  # Error during search
-
-    debug_info += ("Found object: " + (current_obj.get_name() if hasattr(current_obj, 'get_name') else "Unnamed")) + "\\n"
-    return current_obj
-
-
-try:
-    print("Starting POU code setting script for {0}")
-    
-    # Check if we have an active project
-    if not hasattr(session, 'active_project') or session.active_project is None:
-        print("No active project in session")
-        result = {{"success": False, "error": "No active project in session"}}
-    else:
-        # Get active project
-        project = session.active_project
-        print("Got active project")
-        
-        # Use robust object finding method
-        try:
-            full_path = "{1}"
-            print("Using full POU path: " + full_path)
-            
-            # Find the POU using the robust path finder
-            pou = find_object_by_path_robust(project, full_path, "POU")
-            
-            if not pou:
-                print("POU not found using robust path finder: " + full_path)
-                # with open(r"E:\\Openness\\codesys-api\\my.log", "w") as ff:
-                #     ff.write(debug_info.encode("utf-8"))
-                result = {{"success": False, "error": "POU not found: " + full_path}}
-            else:
-                # POU was found
-                pou_name = pou.get_name() if hasattr(pou, 'get_name') else full_path.split('/')[-1]
-                print("Found POU: " + pou_name)
-                
-                    # Set implementation code using textual_implementation approach as shown in working example
-                print("Found POU, setting implementation code")
-                
-                # Try to use the working approach from set_pou_code.py
-                if hasattr(pou, 'textual_implementation'):
-                    impl_obj = pou.textual_implementation
-                    if impl_obj and hasattr(impl_obj, 'replace'):
-                        try:
-                            print("Setting implementation using textual_implementation.replace()")
-                            impl_obj.replace("{2}")
-                            print("Updated POU implementation code successfully")
-                            
-                            # Save the project to persist changes
-                            try:
-                                print("Saving project after code change...")
-                                project.save()
-                                print("Project saved successfully")
-                            except Exception as save_err:
-                                print("Warning: Failed to save project after code change: " + str(save_err))
-                            
-                            # Return success
-                            result = {{
-                                "success": True,
-                                "message": "POU code updated",
-                                "pou": {{
-                                    "name": pou_name,
-                                    "path": "{0}"
-                                }}
-                            }}
-                        except Exception as impl_err:
-                            print("Error setting implementation: " + str(impl_err))
-                            print(traceback.format_exc())
-                            result = {{
-                                "success": False,
-                                "error": "Error setting implementation: " + str(impl_err)
-                            }}
-                    else:
-                        print("textual_implementation exists but lacks replace method")
-                        result = {{
-                            "success": False,
-                            "error": "POU textual_implementation doesn't have replace method"
-                        }}
-                else:
-                    # Fall back to other methods as a last resort
-                    print("POU doesn't have textual_implementation attribute, trying alternatives")
-                    if hasattr(pou, 'set_implementation_code'):
-                        try:
-                            pou.set_implementation_code("{2}")
-                            print("Updated POU implementation via set_implementation_code")
-                            result = {{
-                                "success": True,
-                                "message": "POU code updated",
-                                "pou": {{
-                                    "name": pou_name,
-                                    "path": "{0}"
-                                }}
-                            }}
-                        except Exception as e:
-                            print("Error using set_implementation_code: " + str(e))
-                            result = {{"success": False, "error": str(e)}}
-                    else:
-                        # No suitable method found
-                        print("No method found to update POU code, object type: " + str(type(pou)))
-                        result = {{
-                            "success": False,
-                            "error": "POU found but no method to update its code was found"
-                        }}
-        except Exception as e:
-            print("Error processing POU path: " + str(e))
-            print(traceback.format_exc())
-            result = {{"success": False, "error": "Error processing POU path: " + str(e)}}
-        # except Exception as e:
-        #     print("Error processing POU: " + str(e))
-        #     print(traceback.format_exc())
-        #     result = {{"success": False, "error": "Error processing POU: " + str(e)}}
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in POU code setting script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {{"success": False, "error": str(error_value)}}
-""".format(pou_path, full_pou_path, code)
-
-    def generate_pou_list_script(self, params):
-        """Generate script to list POUs in the project."""
-        parent_path = params.get("parentPath", "")
-        
-        return """
-import scriptengine
-import json
-import sys
-import traceback
-
-try:
-    print("Starting POU listing script")
-    # Don't use walrus operator (:=) as it's not compatible with IronPython
-    parent_path = "{0}"
-    if parent_path:
-        print("Looking for POUs in parent path: " + parent_path)
-    else:
-        print("Looking for POUs at application level")
-    
-    # Check if we have an active project
-    if not hasattr(session, 'active_project') or session.active_project is None:
-        print("No active project in session")
-        result = {{"success": False, "error": "No active project in session"}}
-    else:
-        # Get active project
-        project = session.active_project
-        print("Got active project")
-        
-        # Try to get application
-        if not hasattr(project, 'active_application') or project.active_application is None:
-            print("Project has no active application")
-            result = {{"success": False, "error": "Project has no active application"}}
-        else:
-            # Get application
-            application = project.active_application
-            print("Got active application")
-            
-            # Start with application as container
-            container = application
-            container_name = "application"
-            
-            # Navigate to parent container if specified
-            if "{0}":
-                try:
-                    print("Navigating to parent path...")
-                    path_parts = "{0}".split('/')
-                    for part in path_parts:
-                        if not part:
-                            continue
-                        
-                        print("Navigating to: " + part)
-                        found = False
-                        
-                        # Try find_object method
-                        if hasattr(container, 'find_object'):
-                            try:
-                                obj = container.find_object(part)
-                                if obj is not None:
-                                    container = obj
-                                    container_name = part
-                                    found = True
-                                    print("Found via find_object")
-                            except Exception as nfe:
-                                print("Error using find_object: " + str(nfe))
-                        
-                        # Try get_object method if find_object failed or doesn't exist
-                        if not found and hasattr(container, 'get_object'):
-                            try:
-                                obj = container.get_object(part)
-                                if obj is not None:
-                                    container = obj
-                                    container_name = part
-                                    found = True
-                                    print("Found via get_object")
-                            except Exception as nge:
-                                print("Error using get_object: " + str(nge))
-                        
-                        # Try to iterate through objects collection if other methods failed
-                        if not found and hasattr(container, 'objects'):
-                            for obj in container.objects:
-                                if hasattr(obj, 'name') and obj.name == part:
-                                    container = obj
-                                    container_name = part
-                                    found = True
-                                    print("Found via objects collection")
-                                    break
-                        
-                        # If still not found, raise error
-                        if not found:
-                            raise ValueError("Cannot navigate to " + part + ", object not found by any method")
-                    
-                    print("Navigation complete, at container: " + container_name)
-                except Exception as e:
-                    print("Error navigating to path: " + str(e))
-                    print(traceback.format_exc())
-                    result = {{"success": False, "error": "Error navigating to path: " + str(e)}}
-            
-            # Only proceed if we haven't set an error result yet
-            if 'result' not in locals():
-                print("Looking for POUs in container: " + container_name)
-                
-                # Get POUs
-                pous = []
-                
-                # Try different methods to get POUs depending on CODESYS API version
-                try:
-                    # Method 1: Get POUs from container's pou_container
-                    if hasattr(container, 'pou_container'):
-                        print("Container has pou_container")
-                        pou_container = container.pou_container
-                        
-                        if hasattr(pou_container, 'pous'):
-                            print("Getting POUs from pou_container.pous")
-                            pous_list = pou_container.pous
-                            for pou in pous_list:
-                                try:
-                                    pou_type = "Unknown"
-                                    if hasattr(pou, 'type'):
-                                        pou_type = str(pou.type).split('.')[-1]
-                                    
-                                    language = "Unknown"
-                                    if hasattr(pou, 'implementation_language'):
-                                        language = str(pou.implementation_language).split('.')[-1]
-                                    
-                                    pou_name = str(pou.name) if hasattr(pou, 'name') else "UnknownName"
-                                    
-                                    pous.append({{
-                                        "name": pou_name,
-                                        "type": pou_type,
-                                        "language": language
-                                    }})
-                                    print("Added POU: " + pou_name)
-                                except Exception as pou_error:
-                                    print("Error processing POU: " + str(pou_error))
-                    
-                    # Method 2: Direct access to pous attribute
-                    elif hasattr(container, 'pous'):
-                        print("Getting POUs from container.pous")
-                        pous_list = container.pous
-                        for pou in pous_list:
-                            try:
-                                pou_type = "Unknown"
-                                if hasattr(pou, 'type'):
-                                    pou_type = str(pou.type).split('.')[-1]
-                                
-                                language = "Unknown"
-                                if hasattr(pou, 'implementation_language'):
-                                    language = str(pou.implementation_language).split('.')[-1]
-                                
-                                pou_name = str(pou.name) if hasattr(pou, 'name') else "UnknownName"
-                                
-                                pous.append({{
-                                    "name": pou_name,
-                                    "type": pou_type,
-                                    "language": language
-                                }})
-                                print("Added POU: " + pou_name)
-                            except Exception as pou_error:
-                                print("Error processing POU: " + str(pou_error))
-                    
-                    # Method 3: Get POUs through get_pous method
-                    elif hasattr(container, 'get_pous'):
-                        print("Getting POUs from container.get_pous()")
-                        pous_list = container.get_pous()
-                        for pou in pous_list:
-                            try:
-                                pou_type = "Unknown"
-                                if hasattr(pou, 'type'):
-                                    pou_type = str(pou.type).split('.')[-1]
-                                
-                                language = "Unknown"
-                                if hasattr(pou, 'implementation_language'):
-                                    language = str(pou.implementation_language).split('.')[-1]
-                                
-                                pou_name = str(pou.name) if hasattr(pou, 'name') else "UnknownName"
-                                
-                                pous.append({{
-                                    "name": pou_name,
-                                    "type": pou_type,
-                                    "language": language
-                                }})
-                                print("Added POU: " + pou_name)
-                            except Exception as pou_error:
-                                print("Error processing POU: " + str(pou_error))
-                    
-                    # Method 4: Try to iterate over objects
-                    elif hasattr(container, 'objects'):
-                        print("Trying to find POUs by iterating through container.objects")
-                        try:
-                            for obj in container.objects:
-                                try:
-                                    # Check if this looks like a POU
-                                    if (hasattr(obj, 'name') and 
-                                        (hasattr(obj, 'type') or 
-                                         hasattr(obj, 'implementation_language') or
-                                         hasattr(obj, 'implementation'))):
-                                        
-                                        pou_type = "Unknown"
-                                        if hasattr(obj, 'type'):
-                                            pou_type = str(obj.type).split('.')[-1]
-                                        
-                                        language = "Unknown"
-                                        if hasattr(obj, 'implementation_language'):
-                                            language = str(obj.implementation_language).split('.')[-1]
-                                        elif hasattr(obj, 'implementation') and hasattr(obj.implementation, 'language'):
-                                            language = str(obj.implementation.language).split('.')[-1]
-                                        
-                                        pou_name = str(obj.name)
-                                        
-                                        pous.append({{
-                                            "name": pou_name,
-                                            "type": pou_type,
-                                            "language": language
-                                        }})
-                                        print("Added potential POU: " + pou_name)
-                                except Exception as obj_error:
-                                    print("Error processing object: " + str(obj_error))
-                        except Exception as iter_error:
-                            print("Error iterating container objects: " + str(iter_error))
-                    else:
-                        print("No method found to list POUs in this container")
-                        
-                    # Return POUs list, even if empty
-                    print("Found " + str(len(pous)) + " POUs")
-                    result = {{
-                        "success": True,
-                        "pous": pous,
-                        "container": container_name
-                    }}
-                except Exception as e:
-                    print("Error getting POUs: " + str(e))
-                    print(traceback.format_exc())
-                    result = {{"success": False, "error": "Error getting POUs: " + str(e)}}
-except Exception as e:
-    error_type, error_value, error_traceback = sys.exc_info()
-    print("Error in POU listing script: " + str(error_value))
-    print(traceback.format_exc())
-    result = {{"success": False, "error": str(error_value)}}
-""".format(parent_path)
-        
-    def generate_script_execute_script(self, params):
-        """Generate script to execute custom script."""
-        script = params.get("script", "")
-        
-        return script
     
     def extract_pou_blocks(self, code: str):
         end_pattern = {
@@ -1954,14 +877,14 @@ pou_mapping = {{
 
 # Try to get application
 project = session.active_project
-print("Got active project")
+# print("Got active project")
 if not hasattr(project, 'active_application') or project.active_application is None:
-    print("Project has no active application")
+    # print("Project has no active application")
     result = {{"success": False, "error": "Project has no active application"}}
     raise Exception("Project has no active application")
 
 application = project.active_application
-print("Got active application")
+# print("Got active application")
 
 def update_variable_type(program_code, new_types):
     pattern = re.compile(r"(VAR)(.*?)(END_VAR)", re.DOTALL)
@@ -1994,7 +917,7 @@ def get_program(application):
         )
         return program
     except Exception, e:
-        print("Error creating program: " + str(e))
+        # print("Error creating program: " + str(e))
         result = {{"success": False, "error": "Error creating program: " + str(e)}}
         raise Exception("Error creating program: " + str(e))
 
@@ -2006,17 +929,17 @@ def create_new_pou(project, pou_info):
     implementation_text = pou_info.get('code_impl')
     ret_type = pou_info.get('ret_type')
 
-    print("Starting POU creation script for %s" % name)
+    # print("Starting POU creation script for %s" % name)
     application = project.active_application
-    print("Got active application")
+    # print("Got active application")
 
     container = application
-    print("Using application object directly for POU creation")
+    # print("Using application object directly for POU creation")
     
     # Use the properly defined POU types and implementation languages
     try:
         # Map the string name to the actual PouType enum value
-        print("Determining POU type for: %s" % pou_type)
+        # print("Determining POU type for: %s" % pou_type)
         
         # Define POU type map according to the working example code
         pou_type_map = {{
@@ -2028,22 +951,22 @@ def create_new_pou(project, pou_info):
         # Get the POU type from the map
         if pou_type in pou_type_map:
             pou_type_value = pou_type_map[pou_type]
-            print("Set POU type to %s" % pou_type)
+            # print("Set POU type to %s" % pou_type)
         else:
-            print("Unknown POU type: %s" % pou_type)
+            # print("Unknown POU type: %s" % pou_type)
             result = {{"success": False, "error": "Unknown POU type: %s" % pou_type}}
             raise Exception("Unknown POU type: %s" % pou_type)
         
-        print("Using default language: ST (None)")
+        # print("Using default language: ST (None)")
         
     except Exception, e:
-        print("Error resolving type values: " + str(e))
+        # print("Error resolving type values: " + str(e))
         result = {{"success": False, "error": "Error resolving type values: " + str(e)}}
         return None, result
     
     # Create POU with the correct parameters
     try:
-        print("Creating POU: " + name)
+        # print("Creating POU: " + name)
         
         # Call with keyword arguments as shown in the example
         if pou_type == "FUNCTION":
@@ -2053,22 +976,22 @@ def create_new_pou(project, pou_info):
                 type=pou_type_value,
                 return_type=ret_type
             )
-            print("Created function with return type")
+            # print("Created function with return type")
         else:
             # For programs and function blocks, return_type should not be specified
             pou = container.create_pou(
                 name=name,
                 type=pou_type_value
             )
-            print("Created POU without return type")
+            # print("Created POU without return type")
         
         if pou is not None:
-            print("POU created successfully")
+            # print("POU created successfully")
 
             pou.textual_declaration.replace(declaration_text)
             pou.textual_implementation.replace(implementation_text)
 
-            print("POU updated successfully")
+            # print("POU updated successfully")
             
             result = {{
                 "success": True,
@@ -2079,10 +1002,10 @@ def create_new_pou(project, pou_info):
             }}
             return pou, result
         else:
-            print("POU creation failed - returned None")
+            # print("POU creation failed - returned None")
             result = {{"success": False, "error": "POU creation failed - returned None"}}
     except Exception, e:
-        print("Error creating POU: " + str(e))
+        # print("Error creating POU: " + str(e))
         result = {{"success": False, "error": "Error creating POU: " + str(e)}}
     
     return None, result
@@ -2090,17 +1013,48 @@ def create_new_pou(project, pou_info):
 
 def clean_app(application):
     try:
-        print("Performing clean build")
+        # print("Performing clean build")
+        
+        program_name = "PLC_PRG"
+        programs = application.find(program_name)
+        if len(programs) > 0:
+            plc_prg = programs[0]
+            clean_decl = "PROGRAM PLC_PRG\\nVAR\\nEND_VAR"
+            try:
+                plc_prg.textual_declaration.replace(clean_decl)
+                # print("Restored PLC_PRG declaration to clean state")
+            except Exception, restore_err:
+                # print("Warning: Failed to restore PLC_PRG declaration: " + str(restore_err))
+                pass
+
+        # print("Cleaning application")
+        all_pous = application.get_children()
+        removed_count = 0
+        if all_pous:
+            for obj in all_pous:
+                try:
+                    obj_name = obj.get_name()
+                    if obj_name != program_name and obj.has_textual_declaration and obj.has_textual_implementation:
+                        # print("Removing POU: " + obj_name)
+                        obj.remove()
+                        removed_count += 1
+                except Exception, remove_err:
+                    # print("Warning: Failed to remove object: " + str(remove_err))
+                    continue
+        
+        # print("Cleanup completed, removed {{}} objects".format(removed_count))
+        
         application.clean()
-        print("Clean operation completed")
+        # print("Clean operation completed")
     except Exception, clean_error:
-        print("Error during clean operation: " + str(clean_error))
-        print("Will attempt to continue with build anyway")
+        # print("Error during clean operation: " + str(clean_error))
+        # print("Will attempt to continue with build anyway")
+        pass
     
 
 def compile_pou(application, pou_objs, pou_mapping):
     start_time = time.time()
-    print("Starting compile process...")
+    # print("Starting compile process...")
 
     compile_msgs = []
 
@@ -2112,9 +1066,9 @@ def compile_pou(application, pou_objs, pou_mapping):
             return -1
 
     try:
-        print("Compiling application...")
+        # print("Compiling application...")
         application.build()
-        print("Compiling operation completed")
+        # print("Compiling operation completed")
         compilation_time = time.time() - start_time
         
         cates = system.get_message_categories(bActive=False)
@@ -2126,10 +1080,10 @@ def compile_pou(application, pou_objs, pou_mapping):
             levels = set([scriptengine.Severity.FatalError, scriptengine.Severity.Error]) # we only consider fatal errors and normal errors
             obj_names = set([obj.get_name() for obj in pou_objs])
             if desc in build_desc_diff_lang:
-                print("Found compile message category, msgs:")
+                # print("Found compile message category, msgs:")
                 msg_objs = system.get_message_objects(category=cate)
-                for obj in msg_objs:
-                    print("Obj pos: {{}}, desc: {{}}, ser: {{}}".format(obj.position_text, obj.text, obj.severity))
+                # for obj in msg_objs:
+                #     print("Obj pos: {{}}, desc: {{}}, ser: {{}}".format(obj.position_text, obj.text, obj.severity))
                 compile_msgs = [
                     {{
                         "Path": extract_line_number(obj.position_text),
@@ -2141,7 +1095,7 @@ def compile_pou(application, pou_objs, pou_mapping):
                     for obj in msg_objs if obj.severity in levels and \\
                         obj.object and obj.object.get_name() in obj_names
                 ]
-                print(compile_msgs)
+                # print(compile_msgs)
 
         result = {{
             "success": True,
@@ -2154,8 +1108,8 @@ def compile_pou(application, pou_objs, pou_mapping):
             "Errors": compile_msgs
         }}
     except Exception, precompile_error:
-        print("Error during precompile operation: " + str(precompile_error))
-        print(traceback.format_exc())
+        # print("Error during precompile operation: " + str(precompile_error))
+        # print(traceback.format_exc())
         result = {{"success": False, "error": "Error during precompile operation: " + str(precompile_error)}}
 
     return result
@@ -2180,18 +1134,18 @@ try:
         raise Exception("")
     
 except Exception, err:
-    print("Error during workflow: " + str(err))
-    print(traceback.format_exc())
+    # print("Error during workflow: " + str(err))
+    # print(traceback.format_exc())
     if not result:
         result = {{"success": False, "error": "Error during workflow: " + str(err)}}
 
 finally:
-    for pou_obj in pou_objs:
-        if pou_obj is not None:
-            pou_obj.remove()
-    # clean_app(application)
-    if project is not None:
-        project.save()
+    # for pou_obj in pou_objs:
+    #     if pou_obj is not None:
+    #         pou_obj.remove()
+    clean_app(application)
+    # if project is not None:
+    #     project.save()
 
 """.format(pou_infos_str)
 
@@ -2261,14 +1215,6 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
             # Route request
             if path == "api/v1/session/status":
                 self.handle_session_status()
-            elif path == "api/v1/project/list":
-                self.handle_project_list()
-            elif path == "api/v1/pou/list":
-                self.handle_pou_list(params)
-            elif path == "api/v1/system/info":
-                self.handle_system_info()
-            elif path == "api/v1/system/logs":
-                self.handle_system_logs()
             else:
                 self.send_error(404, "Not Found")
         except ConnectionAbortedError as e:
@@ -2316,26 +1262,8 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
             # Route request
             if path == "api/v1/session/start":
                 self.handle_session_start()
-            elif path == "api/v1/session/stop":
-                self.handle_session_stop()
-            elif path == "api/v1/session/restart":
-                self.handle_session_restart()
             elif path == "api/v1/project/create":
                 self.handle_project_create(params)
-            elif path == "api/v1/project/open":
-                self.handle_project_open(params)
-            elif path == "api/v1/project/save":
-                self.handle_project_save()
-            elif path == "api/v1/project/close":
-                self.handle_project_close()
-            elif path == "api/v1/project/compile":
-                self.handle_project_compile(params)
-            elif path == "api/v1/pou/create":
-                self.handle_pou_create(params)
-            elif path == "api/v1/pou/code":
-                self.handle_pou_code(params)
-            elif path == "api/v1/script/execute":
-                self.handle_script_execute(params)
             elif path == "api/v1/pou/workflow":
                 self.handle_pou_compile_workflow(params)
             else:
@@ -2441,42 +1369,6 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
                 "error": f"Internal server error: {str(e)}"
             }, 500)
             
-    def handle_session_stop(self):
-        """Handle session/stop endpoint."""
-        if not self.process_manager.stop():
-            self.send_json_response({
-                "success": False,
-                "error": "Failed to stop CODESYS session"
-            }, 500)
-            return
-            
-        self.send_json_response({
-            "success": True,
-            "message": "Session stopped"
-        })
-        
-    def handle_session_restart(self):
-        """Handle session/restart endpoint."""
-        self.process_manager.stop()
-        time.sleep(2)
-        
-        if not self.process_manager.start():
-            self.send_json_response({
-                "success": False,
-                "error": "Failed to restart CODESYS session"
-            }, 500)
-            return
-            
-        # Generate the session start script
-        script = self.script_generator.generate_session_start_script()
-        
-        # Execute the script to properly initialize the session
-        logger.info("Executing session start script in CODESYS after restart")
-        result = self.script_executor.execute_script(script)
-        
-        # Return the result from the script execution
-        self.send_json_response(result)
-            
     def handle_session_status(self):
         """Handle session/status endpoint."""
         # Check process status
@@ -2570,256 +1462,6 @@ class CodesysApiHandler(BaseHTTPRequestHandler):
                 "error": error_msg
             }, 500)
         
-    def handle_project_open(self, params):
-        """Handle project/open endpoint."""
-        if "path" not in params:
-            self.send_json_response({
-                "success": False,
-                "error": "Missing required parameter: path"
-            }, 400)
-            return
-        
-        path = params.get("path", "")
-        logger.info("Project open request for path: %s (executing script in CODESYS)", path)
-        
-        # Generate and execute project open script
-        script = self.script_generator.generate_project_open_script(params)
-        result = self.script_executor.execute_script(script, timeout=30)
-        
-        if result.get("success", False):
-            logger.info("Project opening successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error opening project: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_project_save(self):
-        """Handle project/save endpoint."""
-        logger.info("Project save request (executing script in CODESYS)")
-        
-        # Generate and execute project save script
-        script = self.script_generator.generate_project_save_script()
-        result = self.script_executor.execute_script(script, timeout=30)
-        
-        if result.get("success", False):
-            logger.info("Project save successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error saving project: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_project_close(self):
-        """Handle project/close endpoint."""
-        logger.info("Project close request (executing script in CODESYS)")
-        
-        # Generate and execute project close script
-        script = self.script_generator.generate_project_close_script()
-        result = self.script_executor.execute_script(script, timeout=30)
-        
-        if result.get("success", False):
-            logger.info("Project close successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error closing project: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_project_list(self):
-        """Handle project/list endpoint."""
-        logger.info("Project list request (executing script in CODESYS)")
-        
-        # Generate and execute project list script
-        script = self.script_generator.generate_project_list_script()
-        result = self.script_executor.execute_script(script, timeout=30)
-        
-        if result.get("success", False):
-            logger.info("Project listing successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error listing projects: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_project_compile(self, params):
-        """Handle project/compile endpoint."""
-        logger.info("Project compile request (executing script in CODESYS)")
-        
-        # Generate and execute project compilation script
-        script = self.script_generator.generate_project_compile_script(params)
-        result = self.script_executor.execute_script(script, timeout=60)  # Compilation can take longer
-        
-        if result.get("success", False):
-            logger.info("Project compilation successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error compiling project: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_pou_create(self, params):
-        """Handle pou/create endpoint."""
-        required = ["name", "type", "language"]
-        for field in required:
-            if field not in params:
-                self.send_json_response({
-                    "success": False,
-                    "error": "Missing required parameter: " + field
-                }, 400)
-                return
-                
-        name = params.get("name", "")
-        pou_type = params.get("type", "FunctionBlock")
-        language = params.get("language", "ST")
-        parent_path = params.get("parentPath", "")
-        
-        logger.info("POU create request for '%s' (executing script in CODESYS)", name)
-        
-        # Generate and execute POU creation script
-        script = self.script_generator.generate_pou_create_script(params)
-        result = self.script_executor.execute_script(script, timeout=30)
-        
-        if result.get("success", False):
-            logger.info("POU creation successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error creating POU: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_pou_code(self, params):
-        """Handle pou/code endpoint."""
-        required = ["path", "code"]
-        for field in required:
-            if field not in params:
-                self.send_json_response({
-                    "success": False,
-                    "error": "Missing required parameter: " + field
-                }, 400)
-                return
-                
-        path = params.get("path", "")
-        code = params.get("code", "")
-        
-        logger.info("POU code update request for '%s' (executing script in CODESYS)", path)
-        
-        # Generate and execute POU code setting script
-        script = self.script_generator.generate_pou_code_script(params)
-        result = self.script_executor.execute_script(script, timeout=30)
-        
-        if result.get("success", False):
-            logger.info("POU code update successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error updating POU code: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_pou_list(self, params):
-        """Handle pou/list endpoint."""
-        parent_path = params.get("parentPath", "")
-        
-        logger.info("POU list request (executing script in CODESYS)")
-        
-        # Generate and execute POU listing script
-        script = self.script_generator.generate_pou_list_script(params)
-        result = self.script_executor.execute_script(script, timeout=30)
-        
-        if result.get("success", False):
-            logger.info("POU listing successful")
-            self.send_json_response(result)
-        else:
-            error_msg = result.get("error", "Unknown error")
-            logger.error("Error listing POUs: %s", error_msg)
-            self.send_json_response({
-                "success": False,
-                "error": error_msg
-            }, 500)
-        
-        
-    def handle_script_execute(self, params):
-        """Handle script/execute endpoint."""
-        if "script" not in params:
-            self.send_json_response({
-                "success": False,
-                "error": "Missing required parameter: script"
-            }, 400)
-            return
-            
-        # Get script to execute
-        script = params.get("script", "")
-        first_line = script.split('\n')[0] if script else ""
-        
-        logger.info("Script execute request: %s", 
-                    first_line[:50] + "..." if len(first_line) > 50 else first_line)
-        
-        # Actually execute the script in CODESYS
-        result = self.script_executor.execute_script(script)
-        
-        # Return the result from execution
-        self.send_json_response(result)
-        
-    def handle_system_info(self):
-        """Handle system/info endpoint."""
-        info = {
-            "version": "0.1",
-            "process_manager": {
-                "status": self.process_manager.is_running()
-            },
-            "codesys_path": CODESYS_PATH,
-            "persistent_script": PERSISTENT_SCRIPT
-        }
-        
-        self.send_json_response({
-            "success": True,
-            "info": info
-        })
-        
-    def handle_system_logs(self):
-        """Handle system/logs endpoint."""
-        logs = []
-        
-        if os.path.exists(LOG_FILE):
-            try:
-                with open(LOG_FILE, 'r') as f:
-                    logs = f.readlines()
-            except:
-                pass
-                
-        self.send_json_response({
-            "success": True,
-            "logs": logs
-        })
-    
     def handle_pou_compile_workflow(self, params):
         """Handle POU code compiling workflow"""
         required = ["Code"]
